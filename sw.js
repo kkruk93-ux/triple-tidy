@@ -1,4 +1,4 @@
-const CACHE = 'triple-tidy-v1';
+const CACHE = 'meadow-pile-v1';
 const ASSETS = [
   './',
   './index.html',
@@ -17,6 +17,7 @@ const ASSETS = [
   './js/monetization.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  './privacy.html',
 ];
 
 self.addEventListener('install', (event) => {

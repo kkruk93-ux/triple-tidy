@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Triple Tidy — a cozy three-of-a-kind tile puzzle (PWA).",
+  "description": "Meadow Pile \u2014 a cozy three-of-a-kind tile puzzle (PWA).",
   "scripts": {
     "start": "python3 -m http.server 4173 --bind 127.0.0.1",
     "test:levels": "node tools/verify-levels.js",

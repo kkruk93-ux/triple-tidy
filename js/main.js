@@ -1,4 +1,4 @@
-import { LEVEL_COUNT, BOARD_W, BOARD_H } from './config.js';
+import { APP_NAME, APP_TAGLINE, LEVEL_COUNT, BOARD_W, BOARD_H } from './config.js';
 import { Game } from './game.js';
 import { iconSvg, iconTint, iconName } from './icons.js';
 import {
@@ -26,6 +26,7 @@ let animFast = false;
 let flyLock = false;
 let timerId = 0;
 let toastTimer = 0;
+let tutorialStep = 0;
 
 function formatTime(sec) {
   const s = Math.max(0, Math.floor(sec));
@@ -74,8 +75,8 @@ function renderHome() {
       <button class="icon-btn mute-btn" type="button" data-act="mute" aria-label="${isMuted() ? 'Unmute sounds' : 'Mute sounds'}">${muteGlyph()}</button>
       <div class="brand">
         <div class="logo" aria-hidden="true">${logoSvg()}</div>
-        <h1>Triple Tidy</h1>
-        <p class="tag">Match three. Clear the tray. Tidy the pile.</p>
+        <h1>${APP_NAME}</h1>
+        <p class="tag">${APP_TAGLINE}</p>
       </div>
       <div class="home-actions">
         <button class="btn primary" type="button" data-act="play">${cleared ? 'Continue' : 'Play'}</button>
@@ -98,10 +99,9 @@ function logoSvg() {
   `;
 }
 
-function iconInner(type) {
-  // iconSvg wraps a full svg; for nested use the raw mark via a foreign image is messy.
-  // Draw a mini star for the logo (type 6 is star).
-  return `<path d="M32 8l6.2 14.4 15.8 1.6-12 10.4 3.6 15.6L32 42.4 18.4 50l3.6-15.6-12-10.4 15.8-1.6z" fill="#E6B017"/>`;
+function iconInner(_type) {
+  // Leaf mark, matching the Meadow Pile app icon (original SVG, no emoji).
+  return `<path d="M32 12c14 8 20 22 16 34-12 2-24-8-28-22 4-8 8-10 12-12z" fill="#2F9E6B"/><path d="M32 16c9 7 13 18 11 28" stroke="#1E7A52" stroke-width="1.6" fill="none"/><path d="M32 22c4 2 8 6 10 12M32 30c3 2 6 5 7 9M32 38c2 1 4 3 5 6" stroke="#A6E3C4" stroke-width="1.3" fill="none" stroke-linecap="round"/>`;
 }
 
 function renderLevels() {
@@ -145,7 +145,7 @@ function renderAbout() {
         <button class="icon-btn mute-btn" type="button" data-act="mute" aria-label="${isMuted() ? 'Unmute sounds' : 'Mute sounds'}">${muteGlyph()}</button>
       </header>
       <div class="about-body">
-        <h1>Triple Tidy</h1>
+        <h1>${APP_NAME}</h1>
         <p>A cozy tile puzzle. Lift a free tile onto the tray. Three of a kind vanish. Empty the board to tidy up — but do not overflow the tray.</p>
         <p>Thirty procedurally seeded levels, each built so a solution exists. Play offline, in portrait, at your own pace.</p>
         <h3>Links</h3>
@@ -155,6 +155,7 @@ function renderAbout() {
           <li><a href="https://suno.com/@kkruk93" target="_blank" rel="noopener noreferrer">Suno</a></li>
         </ul>
         <p class="btc">Support (BTC): <span class="addr">bc1qd05h6spuj8dqf9rs9fu4re9rh4q6k0gflfqum8</span></p>
+        <p class="links-extra"><a href="./privacy.html">Privacy policy</a></p>
         <p class="ver">Version 1.0.0</p>
       </div>
     </section>
@@ -191,6 +192,7 @@ function renderPlay() {
         <div class="tray" data-role="tray">${renderTray()}</div>
       </div>
       ${overlay}
+      ${tutorialMarkup()}
       <div class="toast" data-role="toast" hidden></div>
     </section>
   `, 'in-play');
@@ -274,7 +276,46 @@ function loseOverlay() {
 function startLevel(n) {
   game.start(n);
   screen = 'play';
+  tutorialStep = n === 1 && !progress.tutorialDone ? 1 : 0;
   render();
+}
+
+const TUTORIAL = [
+  'Tap a bright tile. It flies down to the tray.',
+  'Three of a kind vanish from the tray.',
+  'If the tray fills up, you lose. Clear the whole pile to win.',
+];
+
+function tutorialMarkup() {
+  if (!tutorialStep || game.status !== 'playing') return '';
+  const last = tutorialStep >= TUTORIAL.length;
+  const label = last ? 'Got it' : 'Next';
+  return `<div class="tutorial" data-role="tutorial">
+    <div class="tutorial-card" data-step="${tutorialStep}">
+      <p class="tutorial-step">Tip ${tutorialStep} of ${TUTORIAL.length}</p>
+      <p class="tutorial-text">${TUTORIAL[tutorialStep - 1]}</p>
+      <button class="btn primary" type="button" data-act="tutorial-next">${label}</button>
+    </div>
+  </div>`;
+}
+
+function advanceTutorial() {
+  if (!tutorialStep) return;
+  if (tutorialStep >= TUTORIAL.length) {
+    tutorialStep = 0;
+    progress.tutorialDone = true;
+    saveProgress(progress);
+  } else {
+    tutorialStep += 1;
+  }
+  renderPlay();
+}
+
+function skipTutorial() {
+  tutorialStep = 0;
+  progress.tutorialDone = true;
+  saveProgress(progress);
+  if (screen === 'play') renderPlay();
 }
 
 function startTimer() {
@@ -440,6 +481,10 @@ app.addEventListener('click', (ev) => {
   if (!btn || !app.contains(btn)) return;
   unlockAudio();
   const act = btn.getAttribute('data-act');
+  if (act === 'tutorial-next') {
+    advanceTutorial();
+    return;
+  }
   if (act === 'mute') {
     progress.muted = toggleMuted();
     saveProgress(progress);
@@ -490,6 +535,7 @@ app.addEventListener('click', (ev) => {
 
 async function playSolution(delay = 0) {
   if (game.status !== 'playing') return { ok: false };
+  if (tutorialStep) skipTutorial();
   const prev = animFast;
   animFast = delay <= 0;
   const ids = game.officialLeft.slice();
@@ -542,6 +588,9 @@ window.__TT__ = {
     screen = name;
     render();
   },
+  skipTutorial,
+  getTutorialStep: () => tutorialStep,
+  refresh: () => render(),
 };
 
 if ('serviceWorker' in navigator) {

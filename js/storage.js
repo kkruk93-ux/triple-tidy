@@ -1,4 +1,4 @@
-import { LEVEL_COUNT, STORAGE_KEY } from './config.js';
+import { LEVEL_COUNT, STORAGE_KEY, LEGACY_STORAGE_KEY } from './config.js';
 import { setRemoveAds } from './monetization.js';
 
 function empty() {
@@ -9,12 +9,13 @@ function empty() {
     bestTime: {},
     muted: false,
     removeAds: false,
+    tutorialDone: false,
   };
 }
 
 export function loadProgress() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return empty();
     const data = JSON.parse(raw);
     const base = empty();
@@ -42,6 +43,7 @@ export function loadProgress() {
       bestTime,
       muted: !!data.muted,
       removeAds: !!data.removeAds,
+      tutorialDone: !!data.tutorialDone,
     };
     setRemoveAds(progress.removeAds);
     return progress;
@@ -58,6 +60,7 @@ export function saveProgress(progress) {
     bestTime: progress.bestTime,
     muted: !!progress.muted,
     removeAds: !!progress.removeAds,
+    tutorialDone: !!progress.tutorialDone,
   };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   setRemoveAds(data.removeAds);

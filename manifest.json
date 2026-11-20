@@ -1,7 +1,7 @@
 {
-  "name": "Triple Tidy",
-  "short_name": "Triple Tidy",
-  "description": "Match three identical tiles to tidy the board. A cozy, colorful puzzle you can play offline.",
+  "name": "Meadow Pile",
+  "short_name": "Meadow Pile",
+  "description": "Match three identical tiles, keep the tray clear, and tidy the pile. A cozy, colorful puzzle you can play offline.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -14,13 +14,25 @@
       "src": "./icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

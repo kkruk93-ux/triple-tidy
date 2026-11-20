@@ -55,7 +55,8 @@ export function buildSequence(bag, rng, delayMatch) {
 }
 
 function placeTiles(sequence, rng, cfg) {
-  const { tileSize, tightness, boardW, boardH, cols, rows } = cfg;
+  const { tileSize, tightness, boardW, boardH, cols, rows, maxLayer } = cfg;
+  const layerCap = maxLayer || 8;
   const stepX = tileSize * 0.78;
   const stepY = tileSize * 0.78;
   const gridW = (cols - 1) * stepX + tileSize;
@@ -96,12 +97,12 @@ function placeTiles(sequence, rng, cfg) {
       const jitter = tileSize * (0.08 + tightness * 0.12);
       x = slot.x + (rng() - 0.5) * jitter * 2;
       y = slot.y + (rng() - 0.5) * jitter * 2;
-      if (placed.length > 3 && tightness < 0.45) {
-        // Pull slightly toward center so the pile does not look sparse.
+      if (placed.length > 3 && tightness < 0.35) {
+        // Early levels stay a little more open; later piles gather tighter.
         const cx = (boardW - tileSize) / 2;
         const cy = (boardH - tileSize) / 2;
-        x = x * 0.82 + cx * 0.18;
-        y = y * 0.82 + cy * 0.18;
+        x = x * 0.92 + cx * 0.08;
+        y = y * 0.92 + cy * 0.08;
       }
     }
 
@@ -112,6 +113,28 @@ function placeTiles(sequence, rng, cfg) {
     for (const p of placed) {
       if (rectsOverlap({ x, y, w: tileSize, h: tileSize }, p)) {
         z = Math.max(z, p.z + 1);
+      }
+    }
+    // If this stack would exceed the level's layer cap, nudge to a freer slot.
+    if (z > layerCap) {
+      let best = null;
+      for (const slot of slots) {
+        const sx = Math.max(2, Math.min(boardW - tileSize - 2, slot.x + (rng() - 0.5) * 6));
+        const sy = Math.max(2, Math.min(boardH - tileSize - 2, slot.y + (rng() - 0.5) * 6));
+        let sz = 0;
+        for (const p of placed) {
+          if (rectsOverlap({ x: sx, y: sy, w: tileSize, h: tileSize }, p)) {
+            sz = Math.max(sz, p.z + 1);
+          }
+        }
+        if (sz <= layerCap && (best == null || sz < best.z)) best = { x: sx, y: sy, z: sz };
+      }
+      if (best) {
+        x = best.x;
+        y = best.y;
+        z = best.z;
+      } else {
+        z = layerCap;
       }
     }
 
