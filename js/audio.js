@@ -91,3 +91,59 @@ export function playShuffle() {
 export function unlockAudio() {
   ac();
 }
+
+
+let vibrateOn = true;
+
+export function setVibrate(value) {
+  vibrateOn = !!value;
+}
+
+export function isVibrate() {
+  return vibrateOn;
+}
+
+export function haptic(kind = 'tap') {
+  if (!vibrateOn) return;
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+  const patterns = {
+    tap: 8,
+    crack: 14,
+    unlock: [10, 24, 16],
+    match: [8, 28, 16],
+    combo: [10, 20, 10, 20, 18],
+    win: [12, 40, 20, 40, 36],
+    lose: [30, 40, 50],
+    hint: 12,
+  };
+  try {
+    navigator.vibrate(patterns[kind] || 8);
+  } catch {
+    /* some browsers throw if vibration is blocked */
+  }
+}
+
+export function playCrack() {
+  const ctx = ac();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  tone(920, t0, 0.05, 'triangle', 0.05);
+  tone(420, t0 + 0.04, 0.08, 'sine', 0.05);
+}
+
+export function playUnlock() {
+  const ctx = ac();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  tone(520, t0, 0.07, 'triangle', 0.05);
+  tone(780, t0 + 0.06, 0.1, 'sine', 0.05);
+}
+
+export function playCombo(n = 2) {
+  const ctx = ac();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const base = 520 + Math.min(6, n) * 40;
+  tone(base, t0, 0.08, 'triangle', 0.06);
+  tone(base * 1.25, t0 + 0.07, 0.1, 'sine', 0.05);
+}

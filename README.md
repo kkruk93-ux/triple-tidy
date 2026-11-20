@@ -4,7 +4,7 @@ A cozy three-of-a-kind tile puzzle. Lift a free tile onto the seven-slot tray, c
 
 The working title was “Triple Tidy.” That name already appears on Google Play (including [Triple Tidy](https://play.google.com/store/apps/details?id=com.tabbler.BestAgencyGame)), so this game ships as **Meadow Pile**.
 
-Playable in a mobile browser, installable as a PWA, and fully offline after the first visit.
+One hundred campaign levels across five worlds (Meadow, Orchard, Garden, Pond, Forest), a Daily Puzzle with a streak, and simple badges. Later worlds add locked tiles, hidden faces, and ice. Playable in a mobile browser, installable as a PWA, and fully offline after the first visit.
 
 ## Play
 
@@ -18,7 +18,7 @@ python3 -m http.server 4173 --bind 127.0.0.1
 
 ## Verify levels
 
-All 30 levels are generated from a fixed seed and checked by a Node solver (official path plus an independent search):
+All 100 campaign levels, plus Daily Puzzle boards, are generated from a fixed seed and checked by a Node solver (official path plus an independent search):
 
 ```bash
 npm run test:levels

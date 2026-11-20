@@ -1,4 +1,4 @@
-import { MASTER_SEED, levelConfig } from './config.js';
+import { MASTER_SEED, dailyConfig, levelConfig } from './config.js';
 import { mulberry32, mixSeed, pick, randInt, shuffleIn } from './rng.js';
 import { addToTray, rectsOverlap } from './board.js';
 import { TRAY_SIZE as TRAY } from './config.js';
@@ -152,9 +152,73 @@ function placeTiles(sequence, rng, cfg) {
   return placed;
 }
 
-export function generateLevel(level, masterSeed = MASTER_SEED) {
-  const cfg = levelConfig(level);
-  const rng = mulberry32(mixSeed(masterSeed, cfg.level));
+function assignSpecials(tiles, sequence, cfg, rng) {
+  const byId = new Map(tiles.map((t) => [t.id, t]));
+  for (const t of tiles) {
+    t.locked = false;
+    t.isKey = false;
+    t.keyFor = 0;
+    t.mystery = false;
+    t.ice = 0;
+  }
+  const used = new Set();
+  const lockN = Math.min(cfg.locks || 0, Math.floor(sequence.length / 6));
+  // Keys appear earlier in the official collection order than the tiles they unlock.
+  for (let n = 0; n < lockN; n++) {
+    const keySlots = [];
+    const lockSlots = [];
+    for (let i = 0; i < sequence.length; i++) {
+      if (used.has(sequence[i].id)) continue;
+      if (i <= sequence.length - 3) keySlots.push(i);
+      if (i >= 2) lockSlots.push(i);
+    }
+    if (keySlots.length < 1 || lockSlots.length < 1) break;
+    const ki = keySlots[Math.floor(rng() * Math.min(keySlots.length, Math.ceil(sequence.length * 0.6)))];
+    const later = lockSlots.filter((i) => i > ki + 1);
+    if (!later.length) continue;
+    const li = later[Math.floor(rng() * later.length)];
+    const key = byId.get(sequence[ki].id);
+    const lock = byId.get(sequence[li].id);
+    if (!key || !lock || key.id === lock.id) continue;
+    key.isKey = true;
+    key.keyFor = lock.id;
+    lock.locked = true;
+    used.add(key.id);
+    used.add(lock.id);
+  }
+
+  const hiddenN = Math.min(cfg.hidden || 0, tiles.length);
+  let hiddenLeft = hiddenN;
+  const hiddenPool = tiles.slice().sort((a, b) => b.z - a.z);
+  for (const tile of hiddenPool) {
+    if (hiddenLeft <= 0) break;
+    tile.mystery = true;
+    hiddenLeft -= 1;
+  }
+
+  const iceN = Math.min(cfg.ice || 0, tiles.length);
+  let iceLeft = iceN;
+  const icePool = shuffleCopy(tiles, rng);
+  for (const tile of icePool) {
+    if (iceLeft <= 0) break;
+    tile.ice = 2;
+    iceLeft -= 1;
+  }
+}
+
+function shuffleCopy(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = a[i];
+    a[i] = a[j];
+    a[j] = tmp;
+  }
+  return a;
+}
+
+function buildFromConfig(cfg, seed) {
+  const rng = mulberry32(seed);
   const bag = [];
   let id = 1;
   for (let type = 0; type < cfg.types; type++) {
@@ -164,11 +228,24 @@ export function generateLevel(level, masterSeed = MASTER_SEED) {
   }
   const sequence = buildSequence(bag, rng, cfg.delayMatch);
   const tiles = placeTiles(sequence, rng, cfg);
+  assignSpecials(tiles, sequence, cfg, rng);
   return {
     level: cfg.level,
     config: cfg,
     tiles,
     solutionIds: sequence.map((t) => t.id),
+    daily: !!cfg.daily,
+    dailyDate: cfg.dailyDate || null,
   };
+}
+
+export function generateLevel(level, masterSeed = MASTER_SEED) {
+  const cfg = levelConfig(level);
+  return buildFromConfig(cfg, mixSeed(masterSeed, cfg.level));
+}
+
+export function generateDaily(isoDate, masterSeed = MASTER_SEED) {
+  const cfg = dailyConfig(isoDate);
+  return buildFromConfig(cfg, mixSeed(masterSeed, Number(String(isoDate).replace(/-/g, '')) ^ 0xDA11));
 }
 

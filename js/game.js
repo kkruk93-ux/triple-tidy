@@ -1,9 +1,8 @@
-import { generateLevel } from './generator.js';
-import { addToTray, cloneTiles, freeTiles, isFree } from './board.js';
-import { levelConfig, starsFor } from './config.js';
+import { generateDaily, generateLevel } from './generator.js';
+import { addToTray, applyKey, canTap, cloneTiles, isFree } from './board.js';
+import { MASTER_SEED, dailyConfig, levelConfig, starsFor } from './config.js';
 import { findSolution, hintTileId, verifySolution } from './solver.js';
 import { mulberry32, mixSeed } from './rng.js';
-import { MASTER_SEED } from './config.js';
 
 export class Game {
   constructor() {
@@ -29,10 +28,16 @@ export class Game {
     this.lastCollect = null;
     this.lastMatch = null;
     this.lastHintId = null;
+    this.lastUnlock = null;
+    this.lastCrack = null;
+    this.combo = 0;
+    this.daily = false;
+    this.dailyDate = null;
+    this.matchesInRow = 0;
+    this.lastMatchAt = 0;
   }
 
-  start(level) {
-    const gen = generateLevel(level);
+  _loadGen(gen) {
     this.level = gen.level;
     this.config = gen.config;
     this.tiles = cloneTiles(gen.tiles);
@@ -51,7 +56,22 @@ export class Game {
     this.lastCollect = null;
     this.lastMatch = null;
     this.lastHintId = null;
+    this.lastUnlock = null;
+    this.lastCrack = null;
+    this.combo = 0;
+    this.daily = !!gen.daily;
+    this.dailyDate = gen.dailyDate || null;
+    this.matchesInRow = 0;
+    this.lastMatchAt = 0;
     return this;
+  }
+
+  start(level) {
+    return this._loadGen(generateLevel(level));
+  }
+
+  startDaily(isoDate) {
+    return this._loadGen(generateDaily(isoDate));
   }
 
   elapsedSec() {
@@ -78,41 +98,76 @@ export class Game {
       tray: this.tray.map((t) => ({ id: t.id, type: t.type })),
       officialLeft: this.officialLeft.slice(),
       clicks: this.clicks,
+      combo: this.combo,
+      matchesInRow: this.matchesInRow,
     };
   }
 
   canCollect(id) {
     if (this.status !== 'playing') return false;
     const tile = this.tiles.find((t) => t.id === id);
-    return !!(tile && isFree(tile, this.tiles));
+    return !!(tile && canTap(tile, this.tiles));
   }
 
   collect(id) {
-    if (!this.canCollect(id)) return { ok: false };
-    this.undoStack.push(this.snapshot());
+    if (!this.canCollect(id)) return { ok: false, locked: this._lockedReason(id) };
     const tile = this.tiles.find((t) => t.id === id);
-    tile.removed = true;
+    this.undoStack.push(this.snapshot());
     this.clicks += 1;
+    this.lastHintId = null;
+    this.lastUnlock = null;
+    this.lastCrack = null;
+
+    if (tile.ice > 1) {
+      tile.ice -= 1;
+      this.lastCrack = { id: tile.id };
+      this.lastCollect = null;
+      this.lastMatch = null;
+      return { ok: true, cracked: true, tile };
+    }
+
+    tile.removed = true;
     if (this.officialLeft[0] === id) this.officialLeft.shift();
     else this.officialLeft = [];
+    let unlocked = null;
+    if (tile.isKey) unlocked = applyKey(this.tiles, tile);
+    this.lastUnlock = unlocked;
     const result = addToTray(this.tray, tile);
     this.tray = result.tray;
-    this.lastCollect = { id, type: tile.type };
+    this.lastCollect = { id, type: tile.type, isKey: !!tile.isKey };
     this.lastMatch = result.matched;
-    this.lastHintId = null;
+    if (result.matched) {
+      const now = Date.now();
+      if (now - this.lastMatchAt < 2200) this.matchesInRow += 1;
+      else this.matchesInRow = 1;
+      this.lastMatchAt = now;
+      this.combo = this.matchesInRow;
+    } else {
+      this.matchesInRow = 0;
+      this.combo = 0;
+    }
 
     if (result.lost) {
       this.status = 'lost';
       this.endedAt = Date.now();
-      return { ok: true, lost: true, matched: null, tile };
+      return { ok: true, lost: true, matched: null, tile, unlocked };
     }
     const left = this.tiles.some((t) => !t.removed);
     if (!left && this.tray.length === 0) {
       this.status = 'won';
       this.endedAt = Date.now();
-      return { ok: true, won: true, matched: result.matched, tile, stars: this.starCount() };
+      return { ok: true, won: true, matched: result.matched, tile, unlocked, stars: this.starCount(), combo: this.combo };
     }
-    return { ok: true, matched: result.matched, tile };
+    return { ok: true, matched: result.matched, tile, unlocked, combo: this.combo };
+  }
+
+  _lockedReason(id) {
+    const tile = this.tiles.find((t) => t.id === id);
+    if (!tile) return 'missing';
+    if (tile.removed) return 'gone';
+    if (!isFree(tile, this.tiles)) return 'covered';
+    if (tile.locked) return 'locked';
+    return 'other';
   }
 
   starCount() {
@@ -133,11 +188,15 @@ export class Game {
     this.tray = snap.tray;
     this.officialLeft = snap.officialLeft;
     this.clicks = snap.clicks;
+    this.combo = snap.combo || 0;
+    this.matchesInRow = snap.matchesInRow || 0;
     this.helps.undo -= 1;
     this.helpsUsed += 1;
     this.lastCollect = null;
     this.lastMatch = null;
     this.lastHintId = null;
+    this.lastUnlock = null;
+    this.lastCrack = null;
     return { ok: true };
   }
 
@@ -148,14 +207,16 @@ export class Game {
     const remaining = this.tiles.filter((t) => !t.removed);
     if (remaining.length < 3) return { ok: false, reason: 'few' };
 
-    const seed = mixSeed(MASTER_SEED, (this.level + 17) * 1009 + this.clicks + remaining.length);
+    const seed = mixSeed(MASTER_SEED, ((this.level || 1) + 17) * 1009 + this.clicks + remaining.length);
     const rng = mulberry32(seed);
-    const bag = remaining.map((t) => ({ id: t.id, type: t.type }));
+    const bag = remaining.map((t) => ({
+      id: t.id,
+      type: t.type,
+      locked: t.locked,
+      isKey: t.isKey,
+      keyFor: t.keyFor,
+    }));
 
-    // Remaining tiles plus current tray must still be a legal sequence.
-    // We only reshuffle positions, keeping the same ids/types, by
-    // generating a new collection order from the current tray state
-    // and placing in reverse (same invariant as the level generator).
     let sequence;
     try {
       sequence = buildSequenceFromState(bag, this.tray, rng, this.config.delayMatch);
@@ -184,7 +245,7 @@ export class Game {
     if (this.status !== 'playing' || this.helps.hint <= 0) {
       return { ok: false, reason: this.helps.hint <= 0 ? 'empty' : 'state' };
     }
-    const id = hintTileId(this.tiles, this.tray, this.officialLeft, 50000);
+    const id = hintTileId(this.tiles, this.tray, this.officialLeft, 80000);
     if (id == null) return { ok: false, reason: 'none' };
     this.helps.hint -= 1;
     this.helpsUsed += 1;
@@ -198,7 +259,6 @@ export class Game {
     return true;
   }
 
-  /** Test hook: fill the tray with seven unmatched tiles and mark a loss. */
   forceLose() {
     if (this.status !== 'playing') return { ok: false };
     const leftovers = this.tiles.filter((t) => !t.removed);
@@ -208,10 +268,11 @@ export class Game {
       if (usedTypes.has(tile.type)) continue;
       usedTypes.add(tile.type);
       tile.removed = true;
+      tile.locked = false;
+      tile.ice = 0;
       tray.push({ id: tile.id, type: tile.type });
       if (tray.length === 7) break;
     }
-    // If fewer than 7 types remain, pad with unique dummy types.
     let dummy = 100;
     while (tray.length < 7) {
       tray.push({ id: -dummy, type: dummy });
@@ -224,6 +285,11 @@ export class Game {
   }
 }
 
+function keyStillRemaining(tile, remaining) {
+  if (!tile.locked) return false;
+  return remaining.some((t) => t.keyFor === tile.id);
+}
+
 function buildSequenceFromState(bag, trayStart, rng, delayMatch) {
   const remaining = bag.slice();
   let tray = trayStart.map((t) => ({ id: t.id, type: t.type }));
@@ -233,6 +299,7 @@ function buildSequenceFromState(bag, trayStart, rng, delayMatch) {
     const counts = new Map();
     for (const t of tray) counts.set(t.type, (counts.get(t.type) || 0) + 1);
     const legal = remaining.filter((tile) => {
+      if (keyStillRemaining(tile, remaining)) return false;
       const c = counts.get(tile.type) || 0;
       return c >= 2 || tray.length + 1 <= TRAY;
     });
@@ -288,4 +355,4 @@ function placeRemaining(sequence, rng, cfg) {
   return placed;
 }
 
-export { verifySolution, findSolution, freeTiles, isFree };
+export { verifySolution, findSolution, dailyConfig };

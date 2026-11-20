@@ -24,8 +24,22 @@ export function isFree(tile, tiles, minFrac = TILE_OVERLAP) {
   return true;
 }
 
+export function isRevealed(tile, tiles) {
+  if (!tile.mystery) return true;
+  if (tile.locked) return false;
+  return isFree(tile, tiles);
+}
+
+export function canTap(tile, tiles) {
+  return isFree(tile, tiles) && !tile.locked;
+}
+
 export function freeTiles(tiles) {
   return tiles.filter((t) => isFree(t, tiles));
+}
+
+export function tappableTiles(tiles) {
+  return tiles.filter((t) => canTap(t, tiles));
 }
 
 /** Insert beside the same type when present; clear three of a kind. */
@@ -72,5 +86,17 @@ export function cloneTiles(tiles) {
     w: t.w,
     h: t.h,
     removed: !!t.removed,
+    locked: !!t.locked,
+    isKey: !!t.isKey,
+    keyFor: t.keyFor || 0,
+    mystery: !!t.mystery,
+    ice: t.ice | 0,
   }));
+}
+
+export function applyKey(tiles, keyTile) {
+  if (!keyTile || !keyTile.keyFor) return null;
+  const target = tiles.find((t) => t.id === keyTile.keyFor);
+  if (target) target.locked = false;
+  return target || null;
 }

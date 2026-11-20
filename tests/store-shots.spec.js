@@ -23,17 +23,23 @@ test('Play Store phone screenshots 1080x1920', async ({ page }) => {
   await page.waitForTimeout(400);
   await shot(page, '01-home.png');
 
+  await page.getByRole('button', { name: 'Worlds' }).click();
+  await expect(page.getByRole('heading', { name: 'Worlds' })).toBeVisible();
+  await page.waitForTimeout(300);
+  await shot(page, '02-worlds.png');
+
+  await page.goto('/?store=1');
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(page.locator('.tutorial-card')).toBeVisible();
   await page.waitForTimeout(350);
-  await shot(page, '02-tutorial.png');
+  await shot(page, '03-tutorial.png');
 
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('button', { name: 'Got it' }).click();
   await expect(page.locator('.tutorial-card')).toHaveCount(0);
   await page.waitForTimeout(200);
-  await shot(page, '03-board.png');
+  await shot(page, '04-board.png');
 
   await page.evaluate(() => {
     window.__TT__.setFast(true);
@@ -43,7 +49,7 @@ test('Play Store phone screenshots 1080x1920', async ({ page }) => {
   });
   await expect(page.locator('.tray .slot.filled').first()).toBeVisible();
   await page.waitForTimeout(200);
-  await shot(page, '04-tray.png');
+  await shot(page, '05-tray.png');
 
   const result = await page.evaluate(async () => {
     window.__TT__.setFast(true);
@@ -51,11 +57,20 @@ test('Play Store phone screenshots 1080x1920', async ({ page }) => {
   });
   expect(result.ok).toBeTruthy();
   await expect(page.getByRole('heading', { name: 'Board tidied!' })).toBeVisible();
-  await page.waitForTimeout(350);
-  await shot(page, '05-win.png');
+  await page.waitForTimeout(450);
+  await shot(page, '06-win.png');
 
-  await page.getByRole('button', { name: 'Levels', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Levels' })).toBeVisible();
-  await page.waitForTimeout(200);
-  await shot(page, '06-levels.png');
+  await page.evaluate(() => {
+    window.__TT__.startLevel(21);
+    window.__TT__.setFast(true);
+  });
+  await expect(page.getByRole('heading', { name: 'Level 21' })).toBeVisible();
+  await expect(page.locator('.mechanic-card, .tile.locked-tile').first()).toBeVisible();
+  await page.waitForTimeout(300);
+  await shot(page, '07-orchard.png');
+
+  await page.evaluate(() => window.__TT__.go('daily'));
+  await expect(page.getByRole('heading', { name: 'Daily Puzzle' })).toBeVisible();
+  await page.waitForTimeout(250);
+  await shot(page, '08-daily.png');
 });

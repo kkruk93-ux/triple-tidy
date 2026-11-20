@@ -36,8 +36,12 @@ for (let level = 1; level <= LEVEL_COUNT; level++) {
     console.error(`L${level} independent path invalid: ${again.reason}`);
     continue;
   }
+  const locks = gen.tiles.filter((x) => x.locked).length;
+  const keys = gen.tiles.filter((x) => x.isKey).length;
+  const hidden = gen.tiles.filter((x) => x.mystery).length;
+  const ice = gen.tiles.filter((x) => x.ice > 0).length;
   console.log(
-    `L${String(level).padStart(2, '0')} OK  tiles=${String(gen.config.tileCount).padStart(3, ' ')} types=${String(gen.config.types).padStart(2, ' ')} layers≤${gen.config.maxLayer}  official ${check.steps}  independent ${found.method} ${found.ids.length} / ${found.nodes} nodes  ${ms}ms`
+    `L${String(level).padStart(3, '0')} OK  tiles=${String(gen.config.tileCount).padStart(3, ' ')} types=${String(gen.config.types).padStart(2, ' ')} lock=${locks}/${keys} hid=${String(hidden).padStart(2, ' ')} ice=${String(ice).padStart(2, ' ')}  official ${check.steps}  independent ${found.method} ${found.ids.length} / ${found.nodes} nodes  ${ms}ms`
   );
 }
 

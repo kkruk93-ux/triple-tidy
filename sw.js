@@ -1,4 +1,4 @@
-const CACHE = 'meadow-pile-v1';
+const CACHE = 'meadow-pile-v2';
 const ASSETS = [
   './',
   './index.html',
