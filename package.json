@@ -1,0 +1,17 @@
+{
+  "name": "triple-tidy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Triple Tidy — a cozy three-of-a-kind tile puzzle (PWA).",
+  "scripts": {
+    "start": "python3 -m http.server 4173 --bind 127.0.0.1",
+    "test:levels": "node tools/verify-levels.js",
+    "test:e2e": "playwright test",
+    "test": "node tools/verify-levels.js && playwright test",
+    "icons": "python3 tools/make-icons.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}
